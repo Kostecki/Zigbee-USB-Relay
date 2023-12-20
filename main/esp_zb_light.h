@@ -46,7 +46,7 @@
 #define HA_ESP_LIGHT_ENDPOINT           10                                      /* esp light bulb device endpoint, used to process light controlling commands */
 #define ESP_ZB_PRIMARY_CHANNEL_MASK     ESP_ZB_TRANSCEIVER_ALL_CHANNELS_MASK    /* Zigbee primary channel mask use in the example */
 #define MANUFACTURER_NAME               "Espressif"
-#define MODEL_ID                        "ESP32C6-RELAY"
+#define MODEL_ID                        "ESP32-C6-RELAY"
 #define POWER_SOURCE                    4                                       /* DC */
 #define ESP_ZB_ZED_CONFIG()                                         \
     {                                                               \
