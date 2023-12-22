@@ -57,14 +57,6 @@
             .keep_alive = ED_KEEP_ALIVE,                            \
         },                                                          \
     }
-#define ESP_ZB_ZR_CONFIG()                                                              \
-    {                                                                                   \
-        .esp_zb_role = ESP_ZB_DEVICE_TYPE_ROUTER,                                       \
-        .install_code_policy = INSTALLCODE_POLICY_ENABLE,                               \
-        .nwk_cfg.zczr_cfg = {                                                           \
-            .max_children = MAX_CHILDREN,                                               \
-        },                                                                              \
-    }
 #define ESP_ZB_DEFAULT_RADIO_CONFIG()                           \
     {                                                           \
         .radio_mode = RADIO_MODE_NATIVE,                        \
