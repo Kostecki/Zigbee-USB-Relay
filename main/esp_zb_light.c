@@ -43,6 +43,9 @@
 #include "ha/esp_zigbee_ha_standard.h"
 #include "esp_zb_light.h"
 #include "string.h"
+#include "driver/gpio.h"
+
+#define RELAY_PIN GPIO_NUM_22
 
 static char manufacturer[16], model[16];
 
@@ -100,7 +103,7 @@ void esp_zb_app_signal_handler(esp_zb_app_signal_t *signal_struct)
 static esp_err_t zb_attribute_handler(const esp_zb_zcl_set_attr_value_message_t *message)
 {
     esp_err_t ret = ESP_OK;
-    bool light_state = 0;
+    bool relay_state = 0;
 
     ESP_RETURN_ON_FALSE(message, ESP_FAIL, TAG, "Empty message");
     ESP_RETURN_ON_FALSE(message->info.status == ESP_ZB_ZCL_STATUS_SUCCESS, ESP_ERR_INVALID_ARG, TAG,
@@ -111,11 +114,12 @@ static esp_err_t zb_attribute_handler(const esp_zb_zcl_set_attr_value_message_t 
         if (message->info.cluster == ESP_ZB_ZCL_CLUSTER_ID_ON_OFF) {
             if (message->attribute.id == ESP_ZB_ZCL_ATTR_ON_OFF_ON_OFF_ID &&
                 message->attribute.data.type == ESP_ZB_ZCL_ATTR_TYPE_BOOL) {
-                light_state = message->attribute.data.value ? *(bool *)message->attribute.data.value : light_state;
-                ESP_LOGI(TAG, "Light sets to %s", light_state ? "On" : "Off");
-                light_driver_set_power(light_state);
+                relay_state = message->attribute.data.value ? *(bool *)message->attribute.data.value : relay_state;
+                // Build-in LED toggle
+                light_driver_set_power(relay_state);
 
-                // TODO: Probably here maybe?
+                // GPIO_22/Relay toggle
+                gpio_set_level(RELAY_PIN, relay_state);
             }
         }
     }
@@ -141,7 +145,6 @@ static void set_zcl_string(char *buffer, char *value)
     buffer[0] = (char) strlen(value);
     memcpy(buffer + 1, value, buffer[0]);
 }
-
 
 static void esp_zb_task(void *pvParameters)
 {
@@ -202,6 +205,12 @@ static void esp_zb_task(void *pvParameters)
     esp_zb_main_loop_iteration();
 }
 
+static void configure_relay(void)
+{
+    gpio_reset_pin(RELAY_PIN);
+    gpio_set_direction(RELAY_PIN, GPIO_MODE_OUTPUT);
+}
+
 void app_main(void)
 {
     esp_zb_platform_config_t config = {
@@ -212,4 +221,6 @@ void app_main(void)
     ESP_ERROR_CHECK(esp_zb_platform_config(&config));
     light_driver_init(LIGHT_DEFAULT_OFF);
     xTaskCreate(esp_zb_task, "Zigbee_main", 4096, NULL, 5, NULL);
+    
+    configure_relay();
 }
