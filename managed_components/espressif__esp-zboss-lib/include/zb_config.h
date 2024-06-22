@@ -492,6 +492,13 @@ Ideally should rework the whole zb_config.h to suit better for that new concept.
 
 #endif  /* ZB_MACSPLIT_HOST */
 
+/* ZB_HAVE_SERIAL_SINGLE is used by default for r22 only
+ * Define ZB_HAVE_MULTI_SERIAL in a vendor file for multi-serial if you need
+ */
+#if !defined(ZB_HAVE_MULTI_SERIAL)
+#define ZB_HAVE_SERIAL_SINGLE
+#endif /* ZB_HAVE_MULTI_SERIAL */
+
 #ifdef ZB_MACSPLIT
 #if defined ZB_MACSPLIT_TRANSPORT_SERIAL || defined ZB_TRANSPORT_LINUX_UART
 #define ZB_MACSPLIT_TRANSPORT_TYPE ZB_MACSPLIT_TRANSPORT_TYPE_SERIAL
@@ -560,9 +567,11 @@ Ideally should rework the whole zb_config.h to suit better for that new concept.
 /*! @} */ /* ZB_CONFIG */
 
 /**
-   Use 32-bit timer
+   Use 64-bit timer
 */
-#define ZB_TIMER_32
+#ifndef ZB_TIMER_64
+#define ZB_TIMER_64
+#endif /* ZB_TIMER_64 */
 
 #ifndef ZB_CB_QUANT
 #define ZB_CB_QUANT 1U
@@ -635,19 +644,19 @@ Ideally should rework the whole zb_config.h to suit better for that new concept.
 /**
    Minimal time between MTORR when ZBOSS decided to run MTORR at some event
  */
-#define ZB_MIN_TIME_BETWEEN_MTORR ZB_MILLISECONDS_TO_BEACON_INTERVAL(10000u)
+#define ZB_MIN_TIME_BETWEEN_MTORR ZB_MILLISECONDS_TO_SYS_TIMER_INTERVAL(10000u)
 /**
    If advised to send MTORR, do it after that delay
  */
-#define ZB_DELAY_BEFORE_ADVISED_MTORR ZB_MILLISECONDS_TO_BEACON_INTERVAL(2000u)
+#define ZB_DELAY_BEFORE_ADVISED_MTORR ZB_MILLISECONDS_TO_SYS_TIMER_INTERVAL(2000u)
 
 
-#define ZB_DELAY_BEFORE_ADVISED_MTORR_HIPRI ZB_MILLISECONDS_TO_BEACON_INTERVAL(500u)
+#define ZB_DELAY_BEFORE_ADVISED_MTORR_HIPRI ZB_MILLISECONDS_TO_SYS_TIMER_INTERVAL(500u)
 
 /**
    Delay to Send MTORR just after boot
  */
-#define ZB_DELAY_BEFORE_MTORR_AT_BOOT ZB_MILLISECONDS_TO_BEACON_INTERVAL(100u)
+#define ZB_DELAY_BEFORE_MTORR_AT_BOOT ZB_MILLISECONDS_TO_SYS_TIMER_INTERVAL(100u)
 
 #endif /*ZB_PRO_STACK*/
 
@@ -835,7 +844,7 @@ ZB_ED_RX_OFF_WHEN_IDLE
 /**
    End device idle time-out
 */
-#define ZB_TIME_ED_IDLE ZB_MILLISECONDS_TO_BEACON_INTERVAL(7500)
+#define ZB_TIME_ED_IDLE ZB_MILLISECONDS_TO_SYS_TIMER_INTERVAL(7500)
 #endif
 
 
@@ -988,10 +997,10 @@ ZB_ED_RX_OFF_WHEN_IDLE
    See Zigbee specification revision 22 subclause 4.4.11
 */
 #ifdef ZB_PRO_STACK
-#define ZB_APS_SECURITY_TIME_OUT_PERIOD ZB_MILLISECONDS_TO_BEACON_INTERVAL(10000U)
+#define ZB_APS_SECURITY_TIME_OUT_PERIOD ZB_MILLISECONDS_TO_SYS_TIMER_INTERVAL(10000U)
 #else
 /* i.e. 700 milliseconds on 2.4 GHz */
-#define ZB_APS_SECURITY_TIME_OUT_PERIOD ZB_MILLISECONDS_TO_BEACON_INTERVAL(700U)
+#define ZB_APS_SECURITY_TIME_OUT_PERIOD ZB_MILLISECONDS_TO_SYS_TIMER_INTERVAL(700U)
 #endif
 
 /**
@@ -1053,11 +1062,13 @@ ZB_ED_RX_OFF_WHEN_IDLE
 /** @endcond */ /* DOXYGEN_INTERNAL_DOC */
 /* Some defaults for ZDO startup */
 
+uint8_t bdb_get_scan_duration(void);
 #ifndef ZB_TRACE_LEVEL
 /**
    NWK: default energy/active scan duration
 */
-#define ZB_DEFAULT_SCAN_DURATION 4U
+#define ZB_DEFAULT_SCAN_DURATION_VALUE 4U
+#define ZB_DEFAULT_SCAN_DURATION       bdb_get_scan_duration()
 
 #ifdef ZB_SUBGHZ_BAND_ENABLED
 /** @cond DOXYGEN_SUBGHZ_FEATURE */
@@ -1073,13 +1084,16 @@ ZB_ED_RX_OFF_WHEN_IDLE
 #ifndef ZB_NSNG
 /* SNCP release build has enabled trace and in the same time requires to have scan duration value set to 3 */
 #ifdef SNCP_MODE
-#define ZB_DEFAULT_SCAN_DURATION 3U
+#define ZB_DEFAULT_SCAN_DURATION_VALUE 3U
+#define ZB_DEFAULT_SCAN_DURATION       bdb_get_scan_duration()
 #else
-#define ZB_DEFAULT_SCAN_DURATION 5U
+#define ZB_DEFAULT_SCAN_DURATION_VALUE 3U
+#define ZB_DEFAULT_SCAN_DURATION       bdb_get_scan_duration()
 #endif /* SNCP_MODE */
 #else
 /* Increase scan duration for NSNG: usually it runs with high trace level, so we can miss beacons if scan too fast */
-#define ZB_DEFAULT_SCAN_DURATION 6U
+#define ZB_DEFAULT_SCAN_DURATION_VALUE 6U
+#define ZB_DEFAULT_SCAN_DURATION       bdb_get_scan_duration()
 #endif
 
 #if defined ZB_SUBGHZ_BAND_ENABLED
@@ -1700,7 +1714,7 @@ exponent.
  */
 #define ZB_ZGPD_CH_SERIES       3U
 
-#define ZB_GPD_COMMISSIONING_RETRY_INTERVAL ZB_MILLISECONDS_TO_BEACON_INTERVAL(500)
+#define ZB_GPD_COMMISSIONING_RETRY_INTERVAL ZB_MILLISECONDS_TO_SYS_TIMER_INTERVAL(500)
 #endif /* ZB_ZGPD_ROLE */
 
 /** The maximum number of reports that GPD can send in the Application Description. */

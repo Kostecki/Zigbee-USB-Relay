@@ -13,5 +13,6 @@
     "system_error": "c",
     "tuple": "c",
     "vector": "c"
-  }
+  },
+  "idf.adapterTargetName": "esp32c6"
 }

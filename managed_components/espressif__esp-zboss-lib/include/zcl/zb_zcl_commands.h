@@ -124,7 +124,7 @@ typedef zb_uint8_t zb_zcl_cmd_t;
 #define ZB_ZCL_BROADCAST_ENDPOINT   0xFFU
 
 /** @brief Minimum time delay between responses to ZCL command sent to broadcast endpoint */
-#define ZB_ZCL_BROADCAST_ENDPOINT_CMD_RESP_JITTER (ZB_MILLISECONDS_TO_BEACON_INTERVAL(100))
+#define ZB_ZCL_BROADCAST_ENDPOINT_CMD_RESP_JITTER (ZB_MILLISECONDS_TO_SYS_TIMER_INTERVAL(100))
 
 /** @cond internals_doc */
 
@@ -648,7 +648,7 @@ typedef ZB_PACKED_PRE struct zb_zcl_read_attr_res_s
  */
 #define ZB_ZCL_GENERAL_GET_NEXT_READ_ATTR_RES(data_buf, read_attr_resp)                        \
 {                                                                                              \
-  zb_uint8_t resp_size = 0xff;                                                                 \
+  zb_uint16_t resp_size = 0xffff;                                                              \
   (read_attr_resp) = zb_buf_len(data_buf) >= ZB_ZCL_READ_ATTR_RESP_SIZE ?                      \
     (zb_zcl_read_attr_res_t*)zb_buf_begin(data_buf) : NULL;                                    \
                                                                                                \
@@ -892,7 +892,7 @@ zb_zcl_write_attr_req_t;
  */
 #define ZB_ZCL_GENERAL_GET_NEXT_WRITE_ATTR_REQ(data_ptr, data_len, write_attr_req)                 \
   {                                                                                                \
-    zb_uint8_t req_size = ZB_UINT8_MAX;                                                                   \
+    zb_uint16_t req_size = ZB_UINT16_MAX;                                                          \
     (write_attr_req) = (data_len) >= ZB_ZCL_WRITE_ATTR_REQ_SIZE                                    \
                            ? (zb_zcl_write_attr_req_t *)(void *)(data_ptr)                         \
                            : NULL;                                                                 \
@@ -952,7 +952,7 @@ zb_zcl_write_attr_res_t;
  */
 #define ZB_ZCL_GET_NEXT_WRITE_ATTR_RES(data_buf, write_attr_resp)          \
 {                                                                          \
-  zb_uint8_t res_size;                                                     \
+  zb_uint16_t res_size;                                                    \
   (write_attr_resp) = zb_buf_len(data_buf) >= ZB_ZCL_WRITE_ATTR_RES_SIZE ? \
     (zb_zcl_write_attr_res_t*)zb_buf_begin(data_buf) : NULL;               \
                                                                            \
@@ -1505,7 +1505,7 @@ zb_zcl_configure_reporting_direction_value_t;
  */
 #define ZB_ZCL_GENERAL_GET_NEXT_CONFIGURE_REPORTING_REQ(data_buf, config_rep_req)                  \
 {                                                                                                  \
-  zb_uint8_t res_size = 0xff;                                                                      \
+  zb_uint16_t res_size = 0xffff;                                                                   \
   /* ZB_ZCL_CONFIGURE_REPORTING_FOR_SEND_SIZE - is minimum payload length */                       \
   (config_rep_req) = zb_buf_len(data_buf) >= ZB_ZCL_CONFIGURE_REPORTING_FOR_RECV_SIZE ?            \
     (zb_zcl_configure_reporting_req_t *)zb_buf_begin(data_buf) : NULL;                             \
@@ -1575,7 +1575,7 @@ zb_zcl_configure_reporting_res_t;
  */
 #define ZB_ZCL_GENERAL_GET_NEXT_CONFIGURE_REPORTING_RES(data_buf, config_rep_res)   \
 {                                                                                   \
-  zb_uint8_t res_size = 0;                                                          \
+  zb_uint16_t res_size = 0;                                                         \
   (config_rep_res) = zb_buf_len(data_buf) >= ZB_ZCL_CONFIGURE_REPORTING_RES_SIZE ?  \
     (zb_zcl_configure_reporting_res_t*)zb_buf_begin(data_buf) : NULL;               \
                                                                                     \
@@ -1754,7 +1754,7 @@ zb_zcl_report_attr_req_t;
  */
 #define ZB_ZCL_GENERAL_GET_NEXT_REPORT_ATTR_REQ(data_buf, rep_attr_req)                     \
 {                                                                                           \
-  zb_uint8_t req_size = 0xff;                                                               \
+  zb_uint16_t req_size = 0xffff;                                                            \
   (rep_attr_req) = zb_buf_len(data_buf) >= ZB_ZCL_REPORT_ATTR_REQ_SIZE ?                    \
     (zb_zcl_report_attr_req_t*)zb_buf_begin(data_buf) : NULL;                               \
                                                                                             \
@@ -2032,8 +2032,8 @@ typedef ZB_PACKED_PRE struct zb_zcl_read_reporting_cfg_rsp_s
  */
 #define ZB_ZCL_GENERAL_GET_READ_REPORTING_CONFIGURATION_RES(data_buf, read_rep_conf_res)   \
 {                                                                                          \
-  zb_uint8_t res_size = 0;                                                                 \
-  zb_uint8_t min_resp_size = sizeof(zb_uint16_t) + 2*sizeof(zb_uint8_t);                   \
+  zb_uint16_t res_size = 0;                                                                \
+  zb_uint16_t min_resp_size = sizeof(zb_uint16_t) + 2*sizeof(zb_uint8_t);                  \
   (read_rep_conf_res) = (min_resp_size < zb_buf_len(data_buf))?                            \
     (zb_zcl_read_reporting_cfg_rsp_t *)zb_buf_begin(data_buf): NULL;                       \
                                                                                            \
@@ -2444,7 +2444,7 @@ zb_zcl_disc_attr_ext_res_t;
 
   /*! Convert internal attribute access bitmask into ZCL/HA1.2 bitmask
  *  value (actually, support 0 and 1 bits) */
-#define ZB_ZCL_CONVERT_ATTR_ACCESS_BITMASK(_access) ((_access) & 0x3U)
+#define ZB_ZCL_CONVERT_ATTR_ACCESS_BITMASK(_access) ((_access) & 0x7U)
 
 /******************** Command handlers ***************************/
 

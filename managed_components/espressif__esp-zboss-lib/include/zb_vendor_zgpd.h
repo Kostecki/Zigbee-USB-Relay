@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021 Espressif Systems (Shanghai) CO LTD
+ * Copyright (c) 2023 Espressif Systems (Shanghai) CO LTD
  * All rights reserved.
  *
  *
@@ -35,18 +35,52 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#define ZB_MACSPLIT
-#define ZB_MACSPLIT_HOST
-#define ZB_MACSPLIT_FW_UPGRADE
-#define ZB_HAVE_IOCTX
-#define MAC_AUTO_DELAY_IN_MAC_GP_SEND
-#define ZB_MACSPLIT_TRANSPORT_SERIAL
-#define ZB_HAVE_SERIAL
-#define ZB_HAVE_SERIAL_SINGLE
+/* Number of buttons supported */
+#define ZB_ENABLE_HA
+#define ZB_ENABLE_ZCL
+#define ZB_TEST_PROFILE
+/* Enable Rejoin Backoff (used in Smart Plug and IAS Zone samples). */
+#define ZB_REJOIN_BACKOFF
+#define ZB_USE_SLEEP
+#define ZB_CERTIFICATION_HACKS    /*Special modes for testing see zb_config.h*/
+#ifdef ZB_USE_SLEEP
+#define ZB_MEMORY_COMPACT
+#endif
 
-#define ZB_MACSPLIT_RESET_DEVICE_AT_START
-/* by define this rcp could transmit ieee mac address to gateway */
-#define USE_HW_LONG_ADDR
-#define MACSPLIT_APP_REVISION 1
+/* ZB3.0 BDB mode */
+#define ZB_BDB_MODE
+#define ZB_BDB_ENABLE_FINDING_BINDING
+#define ZB_DISTRIBUTED_SECURITY_ON
+#define ZB_SECURITY_INSTALLCODES
+
+/* ZGP */
+#define ZB_ENABLE_ZGP
+#define ZB_ENABLE_ZGP_GPCB
+#define ZB_ZGP_TRANSL_CMD_PLD_MAX_SIZE 3
+#define ZGP_CLUSTER_TEST
+#define ZB_ZGP_SKIP_GPDF_ON_NWK_LAYER
+#define ZB_ZGP_RUNTIME_WORK_MODE_WITH_PROXIES
+#define ZB_ZGP_SINK_TBL_SIZE 10
+#define ZB_ZGP_PROXY_TBL_SIZE 4
+
+/* Device support */
+#define ZB_ALL_DEVICE_SUPPORT
+
+/* OOM detection */
+#define ZB_CHECK_OOM_STATUS
+#define ZB_SEND_OOM_STATUS
+
+#define ZB_NO_NVRAM_VER_MIGRATION
+#if CONFIG_ZB_RADIO_NATIVE
+#define ZB_LIMIT_VISIBILITY
+#endif
+
+#define ZB_ZGPD_ROLE
+
 /* TRACE FILE ID NO NEED */
 #define ZB_DONT_NEED_TRACE_FILE_ID
+
+/* ZGP configuration */
+#define ZB_ZGP_MAX_PAIRED_CONF_CLUSTERS         2
+#define ZB_ZGP_MAX_PAIRED_CONF_GPD_COMMANDS     6
+#define ZB_ZGP_APP_DESCR_REPORT_DATA_SIZE       32

@@ -11,32 +11,29 @@ extern "C" {
 #include "esp_err.h"
 #include "zb_vendor.h"
 #include "zb_config_platform.h"
+#include "esp_zigbee_trace.h"
 #include "esp_zigbee_type.h"
 #include "esp_zigbee_attribute.h"
 #include "esp_zigbee_cluster.h"
 #include "esp_zigbee_endpoint.h"
+#include "nwk/esp_zigbee_nwk.h"
 #include "zcl/esp_zigbee_zcl_command.h"
 #include "zdo/esp_zigbee_zdo_command.h"
 #include "bdb/esp_zigbee_bdb_touchlink.h"
+#include "bdb/esp_zigbee_bdb_commissioning.h"
 #include "esp_zigbee_secur.h"
 #include "esp_zigbee_ota.h"
 
 #define ESP_ZB_TRANSCEIVER_ALL_CHANNELS_MASK 0x07FFF800U /*!< channel 11-26 for compatibility with 2.4GHZ*/
 
 #ifdef CONFIG_ZB_ZED
-#define ESP_ZB_SLEEP_MINIMUM_THRESHOLD_MS 20U       /*! Default sleep threshold. Do not sleep when it is less then 1 Beacon Interval to wake up*/
 #define ESP_ZB_SLEEP_MAXIMUM_THRESHOLD_MS 86400000U /*! Maximum sleep threshold*/
 #endif                                              /** CONFIG_ZB_ZED */
 
-/** Enum of the Zigbee network device type
- * @anchor esp_zb_nwk_device_type_t
- */
-typedef enum {
-    ESP_ZB_DEVICE_TYPE_COORDINATOR = 0x0,       /*!<  Device - Coordinator */
-    ESP_ZB_DEVICE_TYPE_ROUTER  = 0x1,           /*!<  Device - Router */
-    ESP_ZB_DEVICE_TYPE_ED = 0x2,                /*!<  Device - End device */
-    ESP_ZB_DEVICE_TYPE_NONE = 0x3,              /*!<  Unknown Device */
-} esp_zb_nwk_device_type_t;
+#ifdef CONFIG_ZB_GP_ENABLED
+#define ESP_ZGP_GPPB_DEFAULT_FUNCTIONALITY 0x9ac2f /*!< GPP functionality, refer to esp_zgp_gpp_functionality_t */
+#define ESP_ZGP_GPS_DEFAULT_FUNCTIONALITY 0x9ac2f /*!< GPS functionality, refer to esp_zgp_gps_functionality_t */
+#endif /* CONFIG_ZB_GP_ENABLED */
 
 /**
  * @name End Device (ED) timeout request
@@ -63,18 +60,45 @@ typedef enum {
 /**
  * @brief Enum of the Zigbee core action callback id
  *
+ * @note If one endpoint possesses the same custom cluster identifier in both client and server roles,
+ *       any request or response command for the custom cluster will only trigger the ESP_ZB_CORE_CMD_CUSTOM_CLUSTER_REQ_CB_ID callback.
  */
 typedef enum esp_zb_core_action_callback_id_s {
     ESP_ZB_CORE_SET_ATTR_VALUE_CB_ID                    = 0x0000,   /*!< Set attribute value, refer to esp_zb_zcl_set_attr_value_message_t */
     ESP_ZB_CORE_SCENES_STORE_SCENE_CB_ID                = 0x0001,   /*!< Store scene, refer to esp_zb_zcl_store_scene_message_t */
     ESP_ZB_CORE_SCENES_RECALL_SCENE_CB_ID               = 0x0002,   /*!< Recall scene, refer to esp_zb_zcl_recall_scene_message_t */
     ESP_ZB_CORE_IAS_ZONE_ENROLL_RESPONSE_VALUE_CB_ID    = 0x0003,   /*!< IAS Zone enroll response, refer to esp_zb_zcl_ias_zone_enroll_response_message_t */
-    ESP_ZB_CORE_OTA_UPGRADE_VALUE_CB_ID                 = 0x0004,   /*!< Upgrade OTA, refer to esp_zb_zcl_ota_update_message_t */
+    ESP_ZB_CORE_OTA_UPGRADE_VALUE_CB_ID                 = 0x0004,   /*!< Upgrade OTA, refer to esp_zb_zcl_ota_upgrade_value_message_t */
+    ESP_ZB_CORE_OTA_UPGRADE_SRV_STATUS_CB_ID            = 0x0005,   /*!< OTA Server status, refer to esp_zb_zcl_ota_upgrade_server_status_message_t */
+    ESP_ZB_CORE_OTA_UPGRADE_SRV_QUERY_IMAGE_CB_ID       = 0x0006,   /*!< OTA Server query image, refer to esp_zb_zcl_ota_upgrade_server_query_image_message_t */
+    ESP_ZB_CORE_THERMOSTAT_VALUE_CB_ID                  = 0x0007,   /*!< Thermostat value, refer to esp_zb_zcl_thermostat_value_message_t */
+    ESP_ZB_CORE_METERING_GET_PROFILE_CB_ID              = 0x0008,   /*!< Metering get profile, refer to esp_zb_zcl_metering_get_profile_message_t */
+    ESP_ZB_CORE_METERING_GET_PROFILE_RESP_CB_ID         = 0x0009,   /*!< Metering get profile response, refer to esp_zb_zcl_metering_get_profile_resp_message_t */
+    ESP_ZB_CORE_METERING_REQ_FAST_POLL_MODE_CB_ID       = 0x000a,   /*!< Metering request fast poll mode, refer to esp_zb_zcl_metering_request_fast_poll_mode_message_t */
+    ESP_ZB_CORE_METERING_REQ_FAST_POLL_MODE_RESP_CB_ID  = 0x000b,   /*!< Metering request fast poll mode response, refer to esp_zb_zcl_metering_request_fast_poll_mode_resp_message_t */
+    ESP_ZB_CORE_METERING_GET_SNAPSHOT_CB_ID             = 0x000c,   /*!< Metering get snapshot, refer to esp_zb_zcl_metering_get_snapshot_message_t */
+    ESP_ZB_CORE_METERING_PUBLISH_SNAPSHOT_CB_ID         = 0x000d,   /*!< Metering publish snapshot, refer to esp_zb_zcl_metering_publish_snapshot_message_t */
+    ESP_ZB_CORE_METERING_GET_SAMPLED_DATA_CB_ID         = 0x000e,   /*!< Metering get sampled data, refer to esp_zb_zcl_metering_get_sampled_data_message_t */
+    ESP_ZB_CORE_METERING_GET_SAMPLED_DATA_RESP_CB_ID    = 0x000f,   /*!< Metering get sampled data response, refer to esp_zb_zcl_metering_get_sampled_data_resp_message_t */
+    ESP_ZB_CORE_DOOR_LOCK_LOCK_DOOR_CB_ID               = 0x0010,   /*!< Lock/unlock door request, refer to esp_zb_zcl_door_lock_lock_door_message_t */
+    ESP_ZB_CORE_DOOR_LOCK_LOCK_DOOR_RESP_CB_ID          = 0x0011,   /*!< Lock/unlock door response, refer to esp_zb_zcl_door_lock_lock_door_resp_message_t */
+    ESP_ZB_CORE_IDENTIFY_EFFECT_CB_ID                   = 0x0012,   /*!< Identify triggers effect request, refer to esp_zb_zcl_identify_effect_message_t */
+    ESP_ZB_CORE_BASIC_RESET_TO_FACTORY_RESET_CB_ID      = 0x0013,   /*!< Reset all clusters of endpoint to factory default, refer to esp_zb_zcl_basic_reset_factory_default_message_t  */
+    ESP_ZB_CORE_PRICE_GET_CURRENT_PRICE_CB_ID           = 0x0014,   /*!< Price get current price, refer to esp_zb_zcl_price_get_current_price_message_t */
+    ESP_ZB_CORE_PRICE_GET_SCHEDULED_PRICES_CB_ID        = 0x0015,   /*!< Price get scheduled prices, refer to esp_zb_zcl_price_get_scheduled_prices_message_t */
+    ESP_ZB_CORE_PRICE_GET_TIER_LABELS_CB_ID             = 0x0016,   /*!< Price get tier labels, refer to esp_zb_zcl_price_get_tier_labels_message_t */
+    ESP_ZB_CORE_PRICE_PUBLISH_PRICE_CB_ID               = 0x0017,   /*!< Price publish price, refer to esp_zb_zcl_price_publish_price_message_t */
+    ESP_ZB_CORE_PRICE_PUBLISH_TIER_LABELS_CB_ID         = 0x0018,   /*!< Price publish tier labels, refer to esp_zb_zcl_price_publish_tier_labels_message_t */
+    ESP_ZB_CORE_PRICE_PRICE_ACK_CB_ID                   = 0x0019,   /*!< Price price acknowledgement, refer to esp_zb_zcl_price_ack_message_t */
+    ESP_ZB_CORE_COMM_RESTART_DEVICE_CB_ID               = 0x001a,   /*!< Commissioning restart device, refer to esp_zigbee_zcl_commissioning_restart_device_message_t */
+    ESP_ZB_CORE_COMM_OPERATE_STARTUP_PARAMS_CB_ID       = 0x001b,   /*!< Commissioning operate startup parameters, refer to esp_zigbee_zcl_commissioning_operate_startup_parameters_message_t */
+    ESP_ZB_CORE_COMM_COMMAND_RESP_CB_ID                 = 0x001c,   /*!< Commissioning command response, refer to esp_zigbee_zcl_commissioning_command_response_message_t */
     ESP_ZB_CORE_CMD_READ_ATTR_RESP_CB_ID                = 0x1000,   /*!< Read attribute response, refer to esp_zb_zcl_cmd_read_attr_resp_message_t */
     ESP_ZB_CORE_CMD_WRITE_ATTR_RESP_CB_ID               = 0x1001,   /*!< Write attribute response, refer to esp_zb_zcl_cmd_write_attr_resp_message_t */
-    ESP_ZB_CORE_CMD_REPORT_CONFIG_RESP_CB_ID            = 0x1002,   /*!< Configure reprot response, refer to esp_zb_zcl_cmd_config_report_resp_message_t */
+    ESP_ZB_CORE_CMD_REPORT_CONFIG_RESP_CB_ID            = 0x1002,   /*!< Configure report response, refer to esp_zb_zcl_cmd_config_report_resp_message_t */
     ESP_ZB_CORE_CMD_READ_REPORT_CFG_RESP_CB_ID          = 0x1003,   /*!< Read report configuration response, refer to esp_zb_zcl_cmd_read_report_config_resp_message_t */
     ESP_ZB_CORE_CMD_DISC_ATTR_RESP_CB_ID                = 0x1004,   /*!< Discover attributes response, refer to esp_zb_zcl_cmd_discover_attributes_resp_message_t */
+    ESP_ZB_CORE_CMD_DEFAULT_RESP_CB_ID                  = 0x1005,   /*!< Default response, refer to esp_zb_zcl_cmd_default_resp_message_t */
     ESP_ZB_CORE_CMD_OPERATE_GROUP_RESP_CB_ID            = 0x1010,   /*!< Group add group response, refer to esp_zb_zcl_groups_operate_group_resp_message_t */
     ESP_ZB_CORE_CMD_VIEW_GROUP_RESP_CB_ID               = 0x1011,   /*!< Group view response, refer to esp_zb_zcl_groups_view_group_resp_message_t */
     ESP_ZB_CORE_CMD_GET_GROUP_MEMBERSHIP_RESP_CB_ID     = 0x1012,   /*!< Group get membership response, refer to esp_zb_zcl_groups_get_group_membership_resp_message_t */
@@ -87,7 +111,27 @@ typedef enum esp_zb_core_action_callback_id_s {
     ESP_ZB_CORE_CMD_CUSTOM_CLUSTER_RESP_CB_ID           = 0x1041,   /*!< Custom Cluster response, refer to esp_zb_zcl_custom_cluster_command_message_t */
     ESP_ZB_CORE_CMD_PRIVILEGE_COMMAND_REQ_CB_ID         = 0x1050,   /*!< Custom Cluster request, refer to esp_zb_zcl_privilege_command_message_t */
     ESP_ZB_CORE_CMD_PRIVILEGE_COMMAND_RESP_CB_ID        = 0x1051,   /*!< Custom Cluster response, refer to esp_zb_zcl_privilege_command_message_t */
-    ESP_ZB_CORE_REPORT_ATTR_CB_ID                       = 0x2000,   /*!< Attribute Report, refer to esp_zb_zcl_report_attr_message_t */
+    ESP_ZB_CORE_CMD_TOUCHLINK_GET_GROUP_ID_RESP_CB_ID   = 0x1060,   /*!< Touchlink commissioning cluster get group id response, refer to esp_zb_touchlink_get_group_identifiers_resp_message_t */
+    ESP_ZB_CORE_CMD_TOUCHLINK_GET_ENDPOINT_LIST_RESP_CB_ID = 0x1061,   /*!< Touchlink commissioning cluster get endpoint list response, refer to esp_zb_zcl_touchlink_get_endpoint_list_resp_message_t */
+    ESP_ZB_CORE_CMD_IAS_ACE_ARM_CB_ID                      = 0x0168,   /*!< IAS ACE cluster Arm command, refer to esp_zb_zcl_ias_ace_arm_message_t */
+    ESP_ZB_CORE_CMD_IAS_ACE_BYPASS_CB_ID                   = 0x0169,   /*!< IAS ACE cluster Bypass command, refer to esp_zb_zcl_ias_ace_bypass_message_t */
+    ESP_ZB_CORE_CMD_IAS_ACE_EMERGENCY_CB_ID                = 0x016A,   /*!< IAS ACE cluster Emergency command, refer to esp_zb_zcl_ias_ace_emergency_message_t */
+    ESP_ZB_CORE_CMD_IAS_ACE_FIRE_CB_ID                     = 0x016B,   /*!< IAS ACE cluster Fire command, refer to esp_zb_zcl_ias_ace_fire_message_t */
+    ESP_ZB_CORE_CMD_IAS_ACE_PANIC_CB_ID                    = 0x016C,   /*!< IAS ACE cluster Panic command, refer to esp_zb_zcl_ias_ace_panic_message_t */
+    ESP_ZB_CORE_CMD_IAS_ACE_GET_PANEL_STATUS_CB_ID         = 0x016D,   /*!< IAS ACE cluster Get Panel Status command, refer to esp_zb_zcl_ias_ace_get_panel_status_message_t */
+    ESP_ZB_CORE_CMD_IAS_ACE_GET_BYPASSED_ZONE_LIST_CB_ID   = 0x016E,   /*!< IAS ACE cluster Get Bypass Zone List command, refer to esp_zb_zcl_ias_ace_get_bypassed_zone_list_message_t */
+    ESP_ZB_CORE_CMD_IAS_ACE_GET_ZONE_STATUS_CB_ID          = 0x016F,   /*!< IAS ACE cluster Get Zone Status command, refer to esp_zb_zcl_ias_ace_get_zone_status_message_t */
+    ESP_ZB_CORE_CMD_IAS_ACE_ARM_RESP_CB_ID                 = 0x0170,   /*!< IAS ACE cluster Arm command response, refer to esp_zb_zcl_ias_ace_arm_response_message_t */
+    ESP_ZB_CORE_CMD_IAS_ACE_GET_ZONE_ID_MAP_RESP_CB_ID     = 0x0171,   /*!< IAS ACE cluster Get Zone ID MAP command response, refer to esp_zb_zcl_ias_ace_get_zone_id_map_response_message_t */
+    ESP_ZB_CORE_CMD_IAS_ACE_GET_ZONE_INFO_RESP_CB_ID       = 0x0172,   /*!< IAS ACE cluster Get Zone Information command response, refer to esp_zb_zcl_ias_ace_get_zone_info_response_message_t */
+    ESP_ZB_CORE_CMD_IAS_ACE_ZONE_STATUS_CHANGED_CB_ID      = 0x0173,   /*!< IAS ACE cluster Zone Status Changed command, refer to esp_zb_zcl_ias_ace_zone_status_changed_message_t */
+    ESP_ZB_CORE_CMD_IAS_ACE_PANEL_STATUS_CHANGED_CB_ID     = 0x0174,   /*!< IAS ACE cluster Panel Status Changed command, refer to esp_zb_zcl_ias_ace_panel_status_changed_message_t */
+    ESP_ZB_CORE_CMD_IAS_ACE_GET_PANEL_STATUS_RESP_CB_ID    = 0x0175,   /*!< IAS ACE cluster Get Panel Status command response, refer to esp_zb_zcl_ias_ace_get_panel_status_response_message_t */
+    ESP_ZB_CORE_CMD_IAS_ACE_SET_BYPASSED_ZONE_LIST_CB_ID   = 0x0176,   /*!< IAS ACE cluster Set Bypassed Zone List command, refer to esp_zb_zcl_ias_ace_set_bypassed_zone_list_message_t */
+    ESP_ZB_CORE_CMD_IAS_ACE_BYPASS_RESP_CB_ID              = 0x0177,   /*!< IAS ACE cluster Bypass command response, refer to esp_zb_zcl_ias_ace_bypass_response_message_t */
+    ESP_ZB_CORE_CMD_IAS_ACE_GET_ZONE_STATUS_RESP_CB_ID     = 0x0178,   /*!< IAS ACE cluster Get Zone Status command response, refer to esp_zb_zcl_ias_ace_get_zone_status_response_message_t */
+    ESP_ZB_CORE_CMD_GREEN_POWER_RECV_CB_ID                 = 0x1F00,   /*!< Green power cluster command receiving, refer to esp_zb_zcl_cmd_green_power_recv_message_t */
+    ESP_ZB_CORE_REPORT_ATTR_CB_ID                          = 0x2000,   /*!< Attribute Report, refer to esp_zb_zcl_report_attr_message_t */
 } esp_zb_core_action_callback_id_t;
 
 /**
@@ -103,13 +147,13 @@ typedef struct {
  *
  */
 typedef struct {
-    uint16_t ed_timeout; /*!< Set End Device Timeout */
-    uint16_t keep_alive; /*!< Set Keep alive Timeout */
+    uint8_t ed_timeout; /*!< Set End Device Timeout, refer to esp_zb_aging_timeout_t */
+    uint32_t keep_alive; /*!< Set Keep alive Timeout, in milliseconds, with a maximum value of 65,000,000,000.*/
 } esp_zb_zed_cfg_t;
 
 /**
  * @brief The Zigbee device configuration.
- * @note  For esp_zb_role please refer defined by @ref esp_zb_nwk_device_type_t.
+ * @note  For esp_zb_role please refer defined by esp_zb_nwk_device_type_t.
  */
 typedef struct esp_zb_cfg_s {
     esp_zb_nwk_device_type_t esp_zb_role; /*!< The nwk device type */
@@ -175,6 +219,17 @@ typedef uint8_t (*esp_zb_cli_resp_callback_t)(uint8_t bufid);
 typedef void (*esp_zb_identify_notify_callback_t)(uint8_t identify_on);
 
 /**
+ * @brief ZCL reset default attribute callback
+ *
+ * @param[in] endpoint   The Endpoint identifier
+ * @param[in] cluster_id The cluster identifier
+ * @param[in] curr_attr  The current attribute information
+ *
+ * @return The default attribute value will be set to
+ */
+typedef void *(*esp_zb_zcl_reset_default_attr_callback_t)(uint8_t endpoint, uint16_t cluster_id, esp_zb_zcl_attribute_t curr_attr);
+
+/**
  * @brief Register the Zigbee core action handler
  *
  * @param[in] cb A callback that user can handle the Zigbee action, refer to esp_zb_core_callback_t
@@ -208,6 +263,13 @@ void esp_zb_raw_command_handler_register(esp_zb_zcl_raw_command_callback_t cb);
 void esp_zb_cli_resp_handler_register(esp_zb_cli_resp_callback_t cb);
 
 /**
+ * @brief Register the callback for the ZCL command send status
+ *
+ * @param[in] cb The ZCL command send status callback, refer to esp_zb_zcl_command_send_status_callback_t
+ */
+void esp_zb_zcl_command_send_status_handler_register(esp_zb_zcl_command_send_status_callback_t cb);
+
+/**
  * @brief   Set the ZCL identify notify callback for specific endpoint.
  *
  * @note  Set a callback for user to handle identify command.
@@ -227,7 +289,7 @@ void esp_zb_identify_notify_handler_register(uint8_t endpoint, esp_zb_identify_n
  * @param[in] endpoint The specific endpoint for @p cluster
  * @param[in] cluster The specific cluster for @p command
  * @param[in] command The specific command ID is required to handle for users.
- * @return 
+ * @return
  *      - ESP_OK: on success
  *      - ESP_FAIL: on failure
  */
@@ -248,21 +310,90 @@ bool esp_zb_zcl_delete_privilege_command(uint8_t endpoint, uint16_t cluster, uin
 /**
  * @brief Set the ZCL scenes cluster scene table for users.
  *
+ * @param[in] endpoint          The endpoint identifier
  * @param[in] group_id          The group id of scene, which will be used to find scenes table record
  * @param[in] scene_id          The scene id of scene, which will be used to find scenes table record
  * @param[in] transition_time   The transition time of scene, whose unit is 100 milliseconds
- * @param[in] field             The pointer to zcl senes extension field list
+ * @param[in] field             The pointer to zcl sense extension field list
  * @return
  *      - ESP_OK: on success
  *      - ESP_FAIL: the group id or scene id is invalid
  */
-esp_err_t esp_zb_zcl_scenes_table_store(uint16_t group_id, uint8_t scene_id, uint16_t transition_time, esp_zb_zcl_scenes_extension_field_t *field);
+esp_err_t esp_zb_zcl_scenes_table_store(uint8_t endpoint, uint16_t group_id, uint8_t scene_id, uint16_t transition_time, esp_zb_zcl_scenes_extension_field_t *field);
 
 /**
  * @brief View the zcl scene table
  *
+ * @param[in] endpoint The specific endpoint identifier
  */
-void esp_zb_zcl_scenes_table_show(void);
+void esp_zb_zcl_scenes_table_show(uint8_t endpoint);
+
+/**
+ * @brief Clear zcl scenes table by index
+ *
+ * @param[in] index The index of scenes table
+ * @return
+ *       - ESP_OK: on success
+ *       - ESP_ERR_INVALID: id out of range
+ *       - ESP_FAILED: failed to clear scene table
+ */
+esp_err_t esp_zb_zcl_scenes_table_clear_by_index(uint16_t index);
+
+/**
+ * @brief Set the maximum number of devices in a Zigbee network
+ *
+ * @note The function will only take effect when called before esp_zb_init(), it determins
+ *       several table size such as the neighbor table and routing table, 64 by default
+ * @param[in] size The overall network size is expected to be set
+ * @return
+ *       - ESP_OK: on success
+ *       - ESP_FAIL: on failure
+ */
+esp_err_t esp_zb_overall_network_size_set(uint16_t size);
+
+/**
+ * @brief Set Zigbee stack I/O buffer size
+ *
+ * @note The function will only take effect when called before esp_zb_init(), 80 by default.
+ * @param[in] size The I/O buffer size is expected to be set
+ * @return
+ *       - ESP_OK: on success
+ *       - ESP_FAIL: on failure
+ */
+esp_err_t esp_zb_io_buffer_size_set(uint16_t size);
+
+/**
+ * @brief Set Zigbee stack scheduler queue size
+ *
+ * @note The function will only take effect when called before esp_zb_init(), 80 by default.
+ * @param[in] size The scheduler queue size is expected to be set
+ * @return
+ *       - ESP_OK: on success
+ *       - ESP_FAIL: on failure
+ */
+esp_err_t esp_zb_scheduler_queue_size_set(uint16_t size);
+
+/**
+ * @brief Set APS source binding table size
+ *
+ * @note The function will only take effect when called before esp_zb_init(), 16 by default
+ * @param[in] size The source binding table size is expected to be set
+ * @return
+ *       - ESP_OK: on success
+ *       - ESP_FAIL: on failure
+ */
+esp_err_t esp_zb_aps_src_binding_table_size_set(uint16_t size);
+
+/**
+ * @brief Set APS destination binding table size
+ *
+ * @note The function will only take effect when called before esp_zb_init(), 16 by default
+ * @param[in] size The destination binding table size is expected to be set
+ * @return
+ *       - ESP_OK: on success
+ *       - ESP_FAIL: on failure
+ */
+esp_err_t esp_zb_aps_dst_binding_table_size_set(uint16_t size);
 
 /**
  * @brief  Zigbee stack initialization.
@@ -277,7 +408,7 @@ void esp_zb_zcl_scenes_table_show(void);
 void esp_zb_init(esp_zb_cfg_t *nwk_cfg);
 
 /**
- * @brief Set the primary channel mask.
+ * @brief Set the BDB primary channel mask.
  *
  * Beacon request will be sent on these channels for the BDB energy scan.
  *
@@ -290,7 +421,14 @@ void esp_zb_init(esp_zb_cfg_t *nwk_cfg);
 esp_err_t esp_zb_set_primary_network_channel_set(uint32_t channel_mask);
 
 /**
- * @brief   Set the secondary channel mask.
+ * @brief Get the BDB primary channel mask
+ *
+ * @return A 32-bit channel mask
+ */
+uint32_t esp_zb_get_primary_network_channel_set(void);
+
+/**
+ * @brief   Set the BDB secondary channel mask.
  *
  * Beacon request will be sent on these channels for the BDB energy scan, if no network found after energy scan on the primary channels.
  *
@@ -299,6 +437,13 @@ esp_err_t esp_zb_set_primary_network_channel_set(uint32_t channel_mask);
             - ESP_ERR_INVALID_ARG if the channel mask is out of range
  */
 esp_err_t esp_zb_set_secondary_network_channel_set(uint32_t channel_mask);
+
+/**
+ * @brief Get the BDB secondary channel mask
+ *
+ * @return A 32-bit channel mask
+ */
+uint32_t esp_zb_get_secondary_network_channel_set(void);
 
 /**
  * @brief   Set the 2.4G channel mask.
@@ -310,12 +455,11 @@ esp_err_t esp_zb_set_secondary_network_channel_set(uint32_t channel_mask);
 esp_err_t esp_zb_set_channel_mask(uint32_t channel_mask);
 
 /**
- * @brief   Set zigbee rx on when idle.
+ * @brief Get the 2.4 channel mask
  *
- * @param[in] rx_on enable/disable rx on when idle.
- *
+ * @return A 32-bit channel mask
  */
-void esp_zb_set_rx_on_when_idle(bool rx_on);
+uint32_t esp_zb_get_channel_mask(void);
 
 /**
  * @brief   Check if device is factory new.
@@ -326,6 +470,49 @@ void esp_zb_set_rx_on_when_idle(bool rx_on);
 bool esp_zb_bdb_is_factory_new(void);
 
 /**
+ * @brief Get the scan duration time
+ *
+ * @return Scan duration is in beacon intervals (15.36 ms)
+ */
+uint8_t esp_zb_bdb_get_scan_duration(void);
+
+/**
+ * @brief Set the scan duration time
+ *
+ * @param[in] duration  The scan duration time is in beacon intervals, defined as ((1 << duration) + 1) * 15.36 ms
+ */
+void esp_zb_bdb_set_scan_duration(uint8_t duration);
+
+/**
+ * @brief Open Zigbee network
+ *
+ * @param[in] permit_duration Zigbee network open time
+ * @return
+ *      - ESP_OK: on success
+ *      - ESP_ERR_NO_MEM: not memory
+ *      - ESP_FAILED: on failed
+ */
+esp_err_t esp_zb_bdb_open_network(uint8_t permit_duration);
+
+/**
+ * @brief Close Zigbee network
+ *
+ * @return
+ *      - ESP_OK: on success
+ *      - ESP_FAIL: on failure
+ */
+esp_err_t esp_zb_bdb_close_network(void);
+
+/**
+ * @brief Check if device has joined network or not
+ *
+ * @return
+ *      - true: device is joined
+ *      - false: device is not joined
+ */
+bool esp_zb_bdb_dev_joined(void);
+
+/**
  * @brief Set Touchlink NWK channel
  *
  * @param[in] channel Touchlink NWK channel value
@@ -334,76 +521,8 @@ bool esp_zb_bdb_is_factory_new(void);
 void esp_zb_zdo_touchlink_set_nwk_channel(uint8_t channel);
 
 /**
- * @brief   Set the Zigbee device long address.
- *
- * @note  Set this function AFTER @ref esp_zb_init called, if user wants to set specific address
- * without reading MAC address from flash refer to tools/mfg_tool or eFUSE.
- *
- * @param[in] addr An 64-bit of IEEE long address, which is presented in little-endian.
- * @return - ESP_OK on success
- */
-esp_err_t esp_zb_set_long_address(esp_zb_ieee_addr_t addr);
-
-/**
- * @brief   Get the Zigbee device long address.
- *
- * @note This function will return a pointer to 64-bit of ieee long address.
- *
- * @param[out] addr An 64-bit of IEEE long address, which is presented in little-endian.
- *
- */
-void esp_zb_get_long_address(esp_zb_ieee_addr_t addr);
-
-/**
- * @brief   Get the Zigbee device short address.
- *
- * @return 16-bit Zigbee short address
- *
- */
-uint16_t esp_zb_get_short_address(void);
-
-/**
- * @brief Set the Zigbee network extended PAN ID.
- *
- * @param ext_pan_id An 64-bit of extended PAN ID, which is presented in little-endian.
- */
-void esp_zb_set_extended_pan_id(const esp_zb_ieee_addr_t ext_pan_id);
-
-/**
- * @brief   Get the Zigbee network extended PAN ID.
- *
- * @note This function will return back a pointer to 64-bit of extended PAN ID.
- *
- * @param[out] ext_pan_id An 64-bit of extended PAN ID, which is presented in little-endian.
- *
- */
-void esp_zb_get_extended_pan_id(esp_zb_ieee_addr_t ext_pan_id);
-
-/**
- * @brief   Get the Zigbee network PAN ID.
- *
- * @return 16-bit Zigbee network PAN ID
- *
- */
-uint16_t esp_zb_get_pan_id(void);
-
-/**
- * @brief   Set the Zigbee network PAN ID.
- *
- * @param[in] pan_id 16-bit Zigbee network PAN ID
- *
- */
-void esp_zb_set_pan_id(uint16_t pan_id);
-
-/**
- * @brief   Get the currently used channel.
- * @return  8-bit Zigbee network channel number
- */
-uint8_t esp_zb_get_current_channel(void);
-
-/**
  * @brief   Set the tx power.
- * @param[in]  power 8-bit of power value in dB
+ * @param[in]  power 8-bit of power value in dB, ranging from IEEE802154_TXPOWER_VALUE_MIN to IEEE802154_TXPOWER_VALUE_MAX
  */
 void esp_zb_set_tx_power(int8_t power);
 
@@ -412,34 +531,6 @@ void esp_zb_set_tx_power(int8_t power);
  * @param[in]  power 8-bit of power pointer value in dB
  */
 void esp_zb_get_tx_power(int8_t *power);
-
-/**
- * @brief  Get the network short address by the IEEE address
- *
- * @param[in] address An 64-bit for the IEEE address, which is presented in little-endian.
- * @return Network short address
- *
- */
-uint16_t esp_zb_address_short_by_ieee(esp_zb_ieee_addr_t address);
-
-/**
- * @brief Get the network IEEE address by the short address
- *
- * @param[in] short_addr The 2-byte address which will been used to search the mapped IEEE address
- * @param[out] ieee_addr The 64-bit of address for Zigbee IEEE address, which is presented in little-endian.
- * @return
- *      - ESP_OK: on success
- *      - ESP_ERR_NOT_FOUND: not found the IEEE address
- */
-esp_err_t esp_zb_ieee_address_by_short(uint16_t short_addr, uint8_t *ieee_addr);
-
-/**
- * @brief   Get the Zigbee network device type.
- *
- * @return device type @ref esp_zb_nwk_device_type_t
- *
- */
-esp_zb_nwk_device_type_t esp_zb_get_network_device_role(void);
 
 /**
  * @brief  Start top level commissioning procedure with specified mode mask.
@@ -452,17 +543,52 @@ esp_zb_nwk_device_type_t esp_zb_get_network_device_role(void);
 esp_err_t esp_zb_bdb_start_top_level_commissioning(uint8_t mode_mask);
 
 /**
- *  @brief Perform "Factory reset" procedure.
- *  @note The device will perform leave Zigbee network. The NVRAM store will be erased.
- *
- *  @note The reset can be performed at any time once the device is started (see esp_zb_start()).
- *  After the reset, the application itself will receive the refer to ZB_ZDO_SIGNAL_LEAVE signal.
- *  the remote coordinator will receive the refer to ZB_ZDO_SIGNAL_LEAVE_INDICATION signal. Further action could apply
- *  based on different circumstances.
- *
- *  @note After factory reset, the system reset will be performed.
+ * @brief Perform `local reset` procedure
+ * @note This only takes effect when the device is on a network. The device will leave the current network and
+ *       clear all Zigbee persistent data, except the outgoing NWK frame counter. It will be in nearly the same
+ *       state as when it left the factory. A `ZB_ZDO_SIGNAL_LEAVE` signal with `ESP_ZB_NWK_LEAVE_TYPE_RESET`
+ *       will be triggered to indicate the end of the procedure.
+ */
+void esp_zb_bdb_reset_via_local_action(void);
+
+/**
+ *  @brief Perform "factory reset" procedure
+ *  @note The device will completely erase the `zb_storage` partition and then restart
  */
 void esp_zb_factory_reset(void);
+
+/**
+ * @brief Reset all endpoints to factory default
+ *
+ * @note If @p cb is not set or @p cb return NULL, the default attribute value will be set to zero
+ * @param[in] reset_report Whether reset report of clusters or not
+ * @param[in] cb The user can utilize the callback to set default attribute value
+ *
+ * @return
+ *      - ESP_OK: on success
+ *      - ESP_FAIL: on failed
+ */
+esp_err_t esp_zb_zcl_reset_all_endpoints_to_factory_default(bool reset_report, esp_zb_zcl_reset_default_attr_callback_t cb);
+
+/**
+ * @brief Reset endpoint to factory default
+ *
+ * @note If @p cb is not set or @p cb return NULL, the default attribute value will be set to zero
+ * @param[in] endpoint      The endpoint identifier which will be reset
+ * @param[in] reset_report  Whether reset report of clusters or not
+ * @param[in] cb The user can utilize the callback to set default attribute value
+ *
+ * @return
+ *      - ESP_OK: on success
+ *      - ESP_FAIL: on failed
+ */
+esp_err_t esp_zb_zcl_reset_endpoint_to_factory_default(uint8_t endpoint, bool reset_report, esp_zb_zcl_reset_default_attr_callback_t cb);
+
+/**
+ * @brief Reset the NVRAM and ZCL data to factory default
+ *
+ */
+void esp_zb_zcl_reset_nvram_to_factory_default(void);
 
 /**
  * @brief   Start Zigbee function.
@@ -501,6 +627,22 @@ void esp_zb_factory_reset(void);
 esp_err_t esp_zb_start(bool autostart);
 
 /**
+ * @brief  Acquire Zigbee lock.
+ *
+ * @note It's mandatory to acquire the lock before calling any Zigbee SDK APIs, except that the call site is in Zigbee callbacks.
+ * @return
+ *      - true: on success
+ *
+ */
+bool esp_zb_lock_acquire(TickType_t block_ticks);
+
+/**
+ * @brief  Release Zigbee lock.
+ *
+ */
+void esp_zb_lock_release(void);
+
+/**
  * @brief  Zigbee main loop iteration.
  *
  * @note Must be called after esp_zb_int() and esp_zb_start()
@@ -518,7 +660,7 @@ void esp_zb_main_loop_iteration(void);
 void esp_zb_cli_main_loop_iteration(void);
 
 /**
- * @brief  Enable / Disable erase NVRAM zone before run the refer to esp_zb_start.
+ * @brief  Enable/Disable erasing the zb_storage field before the stack runs
  *
  * @note   Enable or disable NVRAM erasing on every application startup. Erasing is disabled by default.
  * @param erase - 1 to enable erasing; 0 - disable.
@@ -567,6 +709,33 @@ void esp_zb_scheduler_alarm(esp_zb_callback_t cb, uint8_t param, uint32_t time);
 void esp_zb_scheduler_alarm_cancel(esp_zb_callback_t cb, uint8_t param);
 
 /**
+ * @brief Schedule user alarm - callback to be executed after timeout.
+ *
+ * @note Function will be called via scheduler after timeout expired in millisecond. Timer resolution depends on implementation. Same callback can be scheduled for execution more then once.
+ *
+ * @param[in] cb - function to call via scheduler
+ * @param[in] param - parameter to pass to the function
+ * @param[in] time - timeout, in millisecond
+ *
+ * @return
+ *      - the handle used to cancel the user alarm
+ */
+esp_zb_user_cb_handle_t esp_zb_scheduler_user_alarm(esp_zb_user_callback_t cb, void *param, uint32_t time);
+
+/**
+ * @brief Cancel scheduled user alarm.
+ *
+ * @note This function cancel previously scheduled user alarm.
+ *
+ * @param[in] handle - the handle returned by esp_zb_scheduler_user_alarm
+ *
+ * @return
+ *      - ESP_OK: on success
+ *      - ESP_ERR_NOT_FOUND: not found the user alarm
+ */
+esp_err_t esp_zb_scheduler_user_alarm_cancel(esp_zb_user_cb_handle_t handle);
+
+/**
  * @brief  Set BDB commissioning mode.
  *
  * @param[in] commissioning_mode commissioning mode that refer to esp_zb_bdb_commissioning_mode_mask_t.
@@ -574,11 +743,39 @@ void esp_zb_scheduler_alarm_cancel(esp_zb_callback_t cb, uint8_t param);
  */
 void esp_zb_set_bdb_commissioning_mode(esp_zb_bdb_commissioning_mode_mask_t commissioning_mode);
 
+/**
+ * @brief Set BDB commissioning mode
+ *
+ * @return commissioning mode, refer to esp_zb_bdb_commissioning_mode_mask_t
+ */
+esp_zb_bdb_commissioning_mode_mask_t esp_zb_get_bdb_commissioning_mode(void);
+
+/**
+ * @brief Schedule to cancel Steering procedure for a node not on a network
+ *
+ * @note The signal ESP_ZB_BDB_SIGNAL_STEERING_CANCELLED with the status of this operation will be raised.
+ * @return
+ *      - ESP_OK: on success
+ *      - ESP_FAIL: on failed
+ */
+esp_err_t esp_zb_bdb_cancel_steering(void);
+
+/**
+ * @brief Schedule to cancel Formation procedure
+ *
+ * @note The signal ESP_ZB_BDB_SIGNAL_FORMATION_CANCELLED with the status of the operation will be raised.
+ * @return
+ *      - ESP_OK: on success
+ *      - ESP_FAIL: on failed
+ */
+esp_err_t esp_zb_bdb_cancel_formation(void);
+
 /* ZCL attribute, cluster, endpoint, device related */
 
 /**
  * @brief Register a Zigbee device.
  *
+ * @note After successful registration, the SDK will retain a copy of the whole data model, the ep_list will be freed.
  * @param[in] ep_list  An endpoint list which wants to register @ref esp_zb_ep_list_s
  *
  * @return
@@ -587,22 +784,24 @@ void esp_zb_set_bdb_commissioning_mode(esp_zb_bdb_commissioning_mode_mask_t comm
  */
 esp_err_t esp_zb_device_register(esp_zb_ep_list_t *ep_list);
 
-/**
- * @brief  Zigbee stack minior initialization for RCP.
- *
- * @warning It is ONLY for RCP initialization for limited Zigbee stack init
- */
-void esp_zb_rcp_init(void);
-
-/**
- * @brief  Zigbee main loop iteration for RCP
- *
- * @warning It is ONLY for RCP main loop iteration.
- *
- */
-void esp_zb_rcp_main_loop_iteration(void);
-
 #ifdef ZB_DISTRIBUTED_SECURITY_ON
+
+/**
+ * @brief Set trust center policy state to distributed or not
+ *
+ * @param[in] enabled The trust center policy state
+ */
+void esp_zb_tc_policy_set_distributed_security(bool enabled);
+
+/**
+ * @brief Check the trust center policy is distributed
+ *
+ * @return
+ *      - true: trust center policy is set as distributed
+ *      - false: trust center policy is not set as distributed
+ */
+bool esp_zb_tc_policy_get_distributed_security();
+
 /**
  * @brief Enable or disable the Zigbee distributed network.
  *
@@ -622,17 +821,33 @@ void esp_zb_zdo_setup_network_as_distributed(void);
  * @return - True: The current network is distributed, otherwise it is not.
  */
 bool esp_zb_network_is_distributed(void);
+
+/**
+ * @brief Enable or disable the Zigbee device to join a distributed TC network
+ *
+ * @note It is disabled by default
+ *
+ * @param[in] enabled Enable or disable
+ */
+void esp_zb_enable_joining_to_distributed(bool enabled);
+
+/**
+ * @brief Determine whether the Zigbee device can join the distributed TC network or not
+ *
+ * @return - True: The Zigbee device can join the distributed TC network; otherwise, it cannot
+ */
+bool esp_zb_joining_to_distributed_network_enabled(void);
 #endif
 
 /**
- * @brief Set the sleep threshold on the device. When the scheduler detects that the device can enter sleep mode, it will notify the application with the signal ESP_ZB_COMMON_SIGNAL_CAN_SLEEP.
- * The device cannot enter sleep mode when the sleep interval is less than this threshold.
- * Default sleep threshold is 20 milliseconds, beacuse do not sleep when it is less then 1 Beacon Interval to wake up.
+ * @brief Set the sleep threshold on the device. When the scheduler detects that the device can enter sleep mode,
+ *        it will notify the application with the signal ESP_ZB_COMMON_SIGNAL_CAN_SLEEP.
+ *        The default sleep threshold is 20 milliseconds.
  *
  * @param[in] threshold_ms Sleep threshold in milliseconds
  *
  * @return ESP_OK if new threshold is valid and applied.
- * @return ESP_FAIL if the user attempts to set a threshold greater than ESP_ZB_SLEEP_MAXIMUM_THRESHOLD_MS or less than ESP_ZB_SLEEP_MINIMUM_THRESHOLD_MS.
+ * @return ESP_FAIL if the user attempts to set a threshold greater than ESP_ZB_SLEEP_MAXIMUM_THRESHOLD_MS.
  *
  */
 esp_err_t esp_zb_sleep_set_threshold(uint32_t threshold_ms);
@@ -658,6 +873,25 @@ void esp_zb_sleep_enable(bool enable);
  *
  */
 bool esp_zb_sleep_is_enable(void);
+
+/**
+ * @brief Get bdb_commissioning_status
+ *
+ * @return commissioning_status refer to esp_zb_bdb_commissioning_status_t
+ *
+ */
+#ifndef ZB_MACSPLIT_DEVICE
+esp_zb_bdb_commissioning_status_t esp_zb_get_bdb_commissioning_status(void);
+#endif
+
+/**
+ * @brief Set the Zigbee node descriptor manufacturer code.
+ *
+ * @note The function should be called in ESP_ZB_ZDO_SIGNAL_PRODUCTION_CONFIG_READY signal
+
+ * @param[in] manufacturer_code The manufacturer code of Zigbee device
+ */
+void esp_zb_set_node_descriptor_manufacturer_code(uint16_t manufacturer_code);
 
 #ifdef __cplusplus
 }

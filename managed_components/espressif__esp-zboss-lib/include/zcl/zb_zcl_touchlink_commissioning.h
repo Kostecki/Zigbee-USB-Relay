@@ -77,29 +77,30 @@
 /** @brief aplcInterPANTransIdLifetime constant value.
   * @see ZCL spec, subclause 13.3.4.2.
   */
-#define ZB_ZLL_APLC_INTRP_TRANSID_LIFETIME ( ZB_MILLISECONDS_TO_BEACON_INTERVAL(8000))
+#define ZB_ZLL_APLC_INTRP_TRANSID_LIFETIME ( ZB_MILLISECONDS_TO_SYS_TIMER_INTERVAL(8000))
 
 /** @brief aplcScanTimeBaseDuration constant value.
   * @see ZCL spec, subclause 13.3.4.2.
   */
-#define ZB_ZLL_APLC_SCAN_TIME_BASE_DURATION ( ZB_MILLISECONDS_TO_BEACON_INTERVAL(250))
+#define ZB_ZLL_APLC_SCAN_TIME_BASE_DURATION ( ZB_MILLISECONDS_TO_SYS_TIMER_INTERVAL(250))
 
 /** @brief aplcRxWindowDuration constant value.
   * @see ZCL spec, subclause 13.3.4.2.
   */
-#define ZB_ZLL_APLC_RX_WINDOW_DURATION (ZB_MILLISECONDS_TO_BEACON_INTERVAL(5000))
+#define ZB_ZLL_APLC_RX_WINDOW_DURATION (ZB_MILLISECONDS_TO_SYS_TIMER_INTERVAL(5000))
 
 /**
  *  @brief aplcMinStartupDelayTime constant value.
  *  @see ZCL spec, subclause 13.3.4.2.
  */
-#define ZB_ZLL_APLC_MIN_STARTUP_DELAY_TIME  (ZB_MILLISECONDS_TO_BEACON_INTERVAL(2000))
+#define ZB_ZLL_APLC_MIN_STARTUP_DELAY_TIME  (ZB_MILLISECONDS_TO_SYS_TIMER_INTERVAL(2000))
 
 /** No attributes for reporting in Touchlink profile. */
 #define ZB_ZLL_REPORT_ATTR_COUNT  0
 
 /*! @name Touchlink Commissioning cluster internals
     Internal structures for Touchlink Commissioning cluster
+    @cond internals_doc
     @internal
     @{
 */
@@ -126,11 +127,13 @@ zb_ret_t zb_zll_send_packet(zb_bufid_t buffer, zb_uint8_t* data_ptr, zb_ieee_add
 
 /* TODO Provide normal battle-time implementation */
 /** @brief Provides new response identifier. */
-#define ZB_ZLL_GET_NEW_RESPONSE_ID() 0x01
+zb_uint32_t zb_zll_get_new_response_id(void);
+#define ZB_ZLL_GET_NEW_RESPONSE_ID() zb_zll_get_new_response_id()
 
 /* TODO Provide normal battle-time implementation */
 /** @brief Provides new inter-PAN transaction identifier. */
-#define ZB_ZLL_GET_NEW_TRANS_ID() 0x01
+zb_uint32_t zb_zll_get_new_trans_id(void);
+#define ZB_ZLL_GET_NEW_TRANS_ID() zb_zll_get_new_trans_id()
 
 /* TODO Remove internal API function calling */
 /** @brief Get NIB Ext Pan ID */
@@ -140,7 +143,8 @@ zb_uint8_t* zb_zll_get_nib_ext_pan_id(void);
 /** @brief Get NIB Update ID */
 zb_uint8_t zb_zll_get_nib_update_id(void);
 
-/*! @} */ /* Commissioning cluster internals */
+/*! @} 
+    @endcond*/ /* Commissioning cluster internals */
 
 /*! @name Touchlink Commissioning cluster commands
     @{
@@ -498,9 +502,10 @@ typedef ZB_PACKED_PRE struct zb_zll_commissioning_device_information_req_s
 {                                                                           \
   zb_zll_commissioning_device_information_req_t *req;                       \
   zb_uint8_t* data_ptr = ZB_ZCL_START_PACKET((buffer));                     \
-  ZB_ZCL_CONSTRUCT_GENERAL_COMMAND_RESP_FRAME_CONTROL_A(data_ptr,           \
+  ZB_ZCL_CONSTRUCT_SPECIFIC_COMMAND_REQ_FRAME_CONTROL_A(data_ptr,           \
         ZB_ZCL_FRAME_DIRECTION_TO_SRV,                                      \
-        ZB_ZCL_NOT_MANUFACTURER_SPECIFIC);                                  \
+        ZB_ZCL_NOT_MANUFACTURER_SPECIFIC,                                   \
+        ZB_ZCL_DISABLE_DEFAULT_RESPONSE);                                   \
   ZB_ZCL_CONSTRUCT_COMMAND_HEADER(                                          \
       data_ptr,                                                             \
       ZB_ZCL_GET_SEQ_NUM(),                                                 \
@@ -684,7 +689,7 @@ typedef ZB_PACKED_PRE struct zb_zll_commissioning_device_information_ep_info_res
     zb_zll_commissioning_device_information_ep_info_res_t* src_ptr =                           \
       (zb_zll_commissioning_device_information_ep_info_res_t*)zb_buf_begin((buffer));          \
     (status) = ZB_ZCL_PARSE_STATUS_SUCCESS;                                                    \
-    ZB_ZCL_PACKET_GET_DATA_IEEE((data_ptr)->ieee_addr, (src_ptr));                             \
+    ZB_IEEE_ADDR_COPY((data_ptr)->ieee_addr, (src_ptr->ieee_addr));                            \
     (data_ptr)->ep_id = src_ptr->ep_id;                                                        \
     ZB_LETOH16(&((data_ptr)->profile_id), &(src_ptr->profile_id));                             \
     ZB_LETOH16(&((data_ptr)->device_id), &(src_ptr->device_id));                               \
@@ -770,8 +775,8 @@ typedef ZB_PACKED_PRE struct zb_zll_commissioning_identify_req_param_s
   /**
    *  @brief Time to identify.
    *  Has special values:
-   *  @li @ref ZB_ZLL_IDENTIFY_STOP - instructs target to exit identify mode.
-   *  @li @ref ZB_ZLL_IDENTIFY_DEFAULT_TIME - instructs target to identify for a default period
+   *  @li ZB_ZLL_IDENTIFY_STOP - instructs target to exit identify mode.
+   *  @li ZB_ZLL_IDENTIFY_DEFAULT_TIME - instructs target to identify for a default period
    *  known by the receiver.
    */
   zb_uint16_t identify_time;
@@ -1594,11 +1599,12 @@ typedef ZB_PACKED_PRE struct zb_zll_commissioning_get_group_ids_req_s
     callback)                                                    \
 {                                                                \
   zb_uint8_t* data_ptr = ZB_ZCL_START_PACKET((buffer));          \
-  ZB_ZCL_CONSTRUCT_SPECIFIC_COMMAND_RES_FRAME_CONTROL(data_ptr); \
+  ZB_ZCL_CONSTRUCT_SPECIFIC_COMMAND_RESP_FRAME_CONTROL_A(data_ptr,\
+      ZB_ZCL_FRAME_DIRECTION_TO_SRV, ZB_ZCL_NOT_MANUFACTURER_SPECIFIC);\
   ZB_ZCL_CONSTRUCT_COMMAND_HEADER(                               \
       data_ptr,                                                  \
       ZB_ZCL_GET_SEQ_NUM(),                                      \
-      ZB_ZLL_CMD_COMMISSIONING_NETWORK_UPDATE_REQ);              \
+      ZB_ZLL_CMD_COMMISSIONING_GET_GROUP_IDENTIFIERS_REQUEST);   \
   ZB_ZCL_PACKET_PUT_DATA8(data_ptr, (start_index));              \
   ZB_ZCL_FINISH_PACKET((buffer), data_ptr)                       \
   ZB_ZCL_SEND_COMMAND_SHORT(                                     \
@@ -1785,7 +1791,8 @@ typedef ZB_PACKED_PRE struct zb_zll_commissioning_get_endpoint_list_req_s
     callback)                                                    \
 {                                                                \
   zb_uint8_t* data_ptr = ZB_ZCL_START_PACKET((buffer));          \
-  ZB_ZCL_CONSTRUCT_SPECIFIC_COMMAND_RES_FRAME_CONTROL(data_ptr); \
+  ZB_ZCL_CONSTRUCT_SPECIFIC_COMMAND_RESP_FRAME_CONTROL_A(data_ptr,\
+  ZB_ZCL_FRAME_DIRECTION_TO_SRV, ZB_ZCL_NOT_MANUFACTURER_SPECIFIC);\
   ZB_ZCL_CONSTRUCT_COMMAND_HEADER(                               \
       data_ptr,                                                  \
       ZB_ZCL_GET_SEQ_NUM(),                                      \
@@ -1886,7 +1893,6 @@ typedef ZB_PACKED_PRE struct zb_zll_commissioning_endpoint_info_record_s
 {                                                         \
   zb_zll_commissioning_endpoint_info_record_t *res_data =               \
     (zb_zll_commissioning_endpoint_info_record_t*)data_ptr;             \
-  res_data = (zb_zll_commissioning_get_endpoint_list_res_t*)data_ptr;   \
   ZB_HTOLE16_VAL(&(res_data->addr_short), (addr));                      \
   res_data->endpoint = (ep);                                            \
   ZB_HTOLE16_VAL(&(res_data->profile_id), (profile));                   \
@@ -1933,7 +1939,7 @@ typedef ZB_PACKED_PRE struct zb_zll_commissioning_endpoint_info_record_s
     zb_zll_commissioning_get_endpoint_list_res_t* src_ptr =                           \
       (zb_zll_commissioning_get_endpoint_list_res_t*)zb_buf_begin((buffer));          \
     (status) = ZB_ZCL_PARSE_STATUS_SUCCESS;                                           \
-    ZB_MEMCPY((data_ptr)), src_ptr, sizeof(zb_zll_commissioning_get_endpoint_list_res_t)); \
+    ZB_MEMCPY((data_ptr), src_ptr, sizeof(zb_zll_commissioning_get_endpoint_list_res_t)); \
     (void)zb_buf_cut_left((buffer), sizeof(zb_zll_commissioning_get_endpoint_list_res_t)); \
   }                                                                                   \
 }
@@ -1960,7 +1966,7 @@ typedef ZB_PACKED_PRE struct zb_zll_commissioning_endpoint_info_record_s
     ZB_LETOH16(&((data_ptr)->addr_short), &(src_ptr->addr_short));                      \
     (data_ptr)->endpoint = src_ptr->endpoint;                                           \
     ZB_LETOH16(&((data_ptr)->profile_id), &(src_ptr->profile_id));                      \
-    ZB_LETOH16(&((data_ptr)->device_id), &(src_ptr_device_id));                         \
+    ZB_LETOH16(&((data_ptr)->device_id), &(src_ptr->device_id));                         \
     (data_ptr)->version = src_ptr->version;                                             \
     (void)zb_buf_cut_left((buffer), sizeof(zb_zll_commissioning_endpoint_info_record_t)); \
   }                                                                                     \
@@ -2005,11 +2011,12 @@ typedef ZB_PACKED_PRE struct zb_zll_commissioning_endpoint_information_s
 {                                                                        \
   zb_uint8_t* data_ptr = ZB_ZCL_START_PACKET((buffer));                  \
   zb_zll_commissioning_endpoint_information_t *req_data;                 \
-  ZB_ZCL_CONSTRUCT_SPECIFIC_COMMAND_RES_FRAME_CONTROL(data_ptr);         \
+  ZB_ZCL_CONSTRUCT_SPECIFIC_COMMAND_REQ_FRAME_CONTROL_A(data_ptr,            \
+  ZB_ZCL_FRAME_DIRECTION_TO_CLI, ZB_ZCL_NOT_MANUFACTURER_SPECIFIC, ZB_ZCL_ENABLE_DEFAULT_RESPONSE);       \
   ZB_ZCL_CONSTRUCT_COMMAND_HEADER(                                       \
       data_ptr,                                                          \
       ZB_ZCL_GET_SEQ_NUM(),                                              \
-      ZB_ZLL_CMD_COMMISSIONING_NETWORK_UPDATE_REQ);                      \
+      ZB_ZLL_CMD_COMMISSIONING_ENDPOINT_INFORMATION);                      \
   req_data = (zb_zll_commissioning_endpoint_information_t*)(data_ptr);   \
   ZB_IEEE_ADDR_COPY(req_data->addr_long, ZB_PIBCACHE_EXTENDED_ADDRESS());\
   ZB_HTOLE16_VAL(&(req_data->addr_short), ZB_PIBCACHE_NETWORK_ADDRESS());\

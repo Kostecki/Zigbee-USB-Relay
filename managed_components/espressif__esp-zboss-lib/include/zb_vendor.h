@@ -40,14 +40,10 @@
 #include "sdkconfig.h"
 #include "esp_log.h"
 
-#if CONFIG_ZB_RCP
-#include "zb_vendor_rcp.h"
-#elif CONFIG_ZB_ZCZR || CONFIG_ZB_ZED
+#if CONFIG_ZB_ZCZR || CONFIG_ZB_ZED
 #include "zb_vendor_default.h"
-#endif
-
-#if CONFIG_ZB_RADIO_MACSPLIT_UART
-#include "zb_vendor_host.h"
+#elif CONFIG_ZB_ZGPD
+#include "zb_vendor_zgpd.h"
 #endif
 
 #if CONFIG_ZB_R22_ENABLE
@@ -97,3 +93,9 @@
 #else
 #define ZB_MAC_QUEUE_SIZE 10U
 #endif
+
+/* The time allotted for adding route information using frame data at the beginning (beacon interval units) */
+#define ZB_NWK_AGGRESSIVE_ROUTE_ADD_TIME 10U
+
+/* Memory configuration */
+#define ZB_CONFIGURABLE_MEM

@@ -160,6 +160,13 @@ void lwip_zb_assert(zb_uint16_t file_id, zb_int_t line_number);
 #define ZB_ASSERT_COMPILE_DECL(expr)
 #endif
 
+#define ZB_ASSERT_PRINTF(expr, format, ...)             \
+    do {                                                \
+        if (!(expr)) {                                  \
+            fprintf(stderr, format"\n", ##__VA_ARGS__); \
+            ZB_ASSERT(0);                               \
+        }                                               \
+    } while (0)
 
 /**
    Ensures, that size of type `type' is not greater than `limit'.  If it is not,
@@ -217,19 +224,6 @@ while (0)
 #else
 #define ZB_CHK_ARR(arr, len)
 #endif  /* ZB_ARRAYS_CHECK */
-
-
-#if !defined ZB_NS_BUILD && defined ZB8051 && defined C8051F120
-#define ZB_P3_ON() LED1 = 0
-#define ZB_P3_OFF() LED1 = 1
-#define ZB_P4_ON() LED2 = 0
-#define ZB_P4_OFF() LED2 = 1
-#else
-#define ZB_P3_ON()
-#define ZB_P3_OFF()
-#define ZB_P4_ON()
-#define ZB_P4_OFF()
-#endif
 
 #if defined ZB_TRAFFIC_DUMP_ON
 /**
